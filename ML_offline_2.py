@@ -1,6 +1,7 @@
 import math
 import sys
 import numpy as np
+import os
 
 # global variables
 LOWEST_FLOAT = sys.float_info.max * (-1)
@@ -339,6 +340,10 @@ if __name__ == '__main__':
     hidden_states = np.shape(transition_mat)[0]  # like alpha, beta, gamma
 
     assert hidden_states == len(state_names), "hidden state count and state names count mismatch"
+
+    # output directory created
+    if not os.path.exists('Output'):
+        os.makedirs('Output')
 
     viterbi(observations=obs_ara, transition_matrix=transition_mat, means=means_array, stds=stds_array,
             state_names_array=state_names, output_file="Output/states_Viterbi_wo_learning.txt")
