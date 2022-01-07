@@ -151,8 +151,10 @@ def forward(observations, transition_matrix, means, stds):
         # print("sum: ", temp_sum)
         # print("before: ", forward_mat[:, i-1])
         # normalize previous probabilities along column
-        for k in range(hidden_states):
-            forward_mat[k][i - 1] = forward_mat[k][i - 1] / temp_sum
+        forward_mat[:, i - 1] /= np.sum(forward_mat[:, i - 1])
+        # noob way
+        # for k in range(hidden_states):
+        #     forward_mat[k][i - 1] = forward_mat[k][i - 1] / temp_sum
         # print("afterL: ",forward_mat[:, i-1])
         # print("sum after: ", np.sum(forward_mat[:, i-1]))
         for j in range(hidden_states):
@@ -160,9 +162,12 @@ def forward(observations, transition_matrix, means, stds):
                 forward_mat[j][i] += forward_mat[k][i - 1] * transition_matrix[k][j] * emission_matrix[j][i]
 
     # last column normalize
-    temp_sum = np.sum(forward_mat[:, total_observations - 1])
-    for k in range(hidden_states):
-        forward_mat[k][total_observations - 1] = forward_mat[k][total_observations - 1] / temp_sum
+    forward_mat[:, total_observations - 1] /= np.sum(forward_mat[:, total_observations - 1])
+
+    # noob way
+    # temp_sum = np.sum(forward_mat[:, total_observations - 1])
+    # for k in range(hidden_states):
+    #     forward_mat[k][total_observations - 1] = forward_mat[k][total_observations - 1] / temp_sum
 
 
     # output_to_file(filename="Output/forward_matrix.txt", row=hidden_states, col=total_observations, matrix=forward_mat)
@@ -192,8 +197,10 @@ def backward(observations, transition_matrix, means, stds):
         # print(f'i: {i} sum: {temp_sum}')
         # print("before: ", backward_mat[:, i+1])
         # normalize previous probabilities along column
-        for k in range(hidden_states):
-            backward_mat[k][i + 1] = backward_mat[k][i + 1] / temp_sum
+        backward_mat[:, i+1] /= np.sum(backward_mat[:, i+1])
+        # noob way
+        # for k in range(hidden_states):
+        #     backward_mat[k][i + 1] = backward_mat[k][i + 1] / temp_sum
         # print("afterL: ",backward_mat[:, i+1])
         # print("sum after: ", np.sum(backward_mat[:, i+1]))
         for j in range(hidden_states):
@@ -201,9 +208,12 @@ def backward(observations, transition_matrix, means, stds):
                 backward_mat[j][i] += backward_mat[k][i + 1] * transition_matrix[j][k] * emission_matrix[k][i + 1]
 
     # first column normalize
-    temp_sum = np.sum(backward_mat[:, 0])
-    for k in range(hidden_states):
-        backward_mat[k][0] = backward_mat[k][0] / temp_sum
+    backward_mat[:, 0] /= np.sum(backward_mat[:, 0])
+
+    # noob way
+    # temp_sum = np.sum(backward_mat[:, 0])
+    # for k in range(hidden_states):
+    #     backward_mat[k][0] = backward_mat[k][0] / temp_sum
 
     # output_to_file(filename="Output/backward_matrix.txt", row=hidden_states, col=total_observations, matrix=backward_mat)
     return backward_mat
@@ -225,10 +235,13 @@ def Baum_Welch(updated_transition_matrix, updated_means_array, updated_stds_arra
     pi_star = (f * b) / fsink
 
     # normalize along column
-    for i in range(total_observations):
-        temp_sum = np.sum(pi_star[:, i])
-        for j in range(hidden_states):
-            pi_star[j][i] = pi_star[j][i] / temp_sum
+    pi_star /= np.sum(pi_star, axis=0)
+
+    # noob way
+    # for i in range(total_observations):
+    #     temp_sum = np.sum(pi_star[:, i])
+    #     for j in range(hidden_states):
+    #         pi_star[j][i] = pi_star[j][i] / temp_sum
 
     # output_to_file(filename="Output/pi_star.txt", row=hidden_states, col=total_observations, matrix=pi_star)
 
@@ -250,12 +263,14 @@ def Baum_Welch(updated_transition_matrix, updated_means_array, updated_stds_arra
                 pi_double_star[index][k] = (f[i][k] * updated_transition_matrix[i][j] * emission_matrix[j][k + 1] * b[j][
                     k + 1]) / fsink
 
-
     # normalize along column
-    for i in range(total_observations - 1):
-        temp_sum = np.sum(pi_double_star[:, i])
-        for j in range(hidden_states * hidden_states):
-            pi_double_star[j][i] = pi_double_star[j][i] / temp_sum
+    pi_double_star /= np.sum(pi_double_star, axis=0)
+
+    # noob way to normalize
+    # for i in range(total_observations - 1):
+    #     temp_sum = np.sum(pi_double_star[:, i])
+    #     for j in range(hidden_states * hidden_states):
+    #         pi_double_star[j][i] = pi_double_star[j][i] / temp_sum
 
     # output_to_file(filename="Output/pi_double_star.txt", row=hidden_states * hidden_states, col=total_observations - 1, matrix=pi_double_star)
 
@@ -267,6 +282,9 @@ def Baum_Welch(updated_transition_matrix, updated_means_array, updated_stds_arra
     new_transition_mat = np.sum(pi_double_star, axis=1).reshape(hidden_states,
                                                                 hidden_states)  # axis=1 means along the row
     # normalize along row
+    # new_transition_mat /= np.sum(new_transition_mat, axis=1) #variance in answer
+
+    # noob way
     for i in range(hidden_states):
         temp_sum = np.sum(new_transition_mat[i, :])
         for j in range(hidden_states):
@@ -336,7 +354,7 @@ if __name__ == '__main__':
     new_means_ara = means_array.copy()
     new_stds_ara = stds_array.copy()
 
-    for i in range(100):
+    for i in range(1000):
         prev_transition_mat = new_transition_mat.copy()
         prev_means_ara = new_means_ara.copy()
         prev_stds_ara = new_stds_ara.copy()
