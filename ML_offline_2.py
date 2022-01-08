@@ -2,6 +2,7 @@ import math
 import sys
 import numpy as np
 import os
+from hmmlearn.hmm import GaussianHMM
 
 # global variables
 LOWEST_FLOAT = sys.float_info.max * (-1)
@@ -15,7 +16,6 @@ def emission_calculate(x, mean, standard_deviation):
 
 def take_input_data(file_name):
     data = np.loadtxt(file_name, dtype=float)
-    # print(data)
     return data
 
 
@@ -148,30 +148,14 @@ def forward(observations, transition_matrix, means, stds):
         forward_mat[i][0] = stationary_distribution[i] * emission_matrix[i][0]
 
     for i in range(1, total_observations):
-        temp_sum = np.sum(forward_mat[:, i - 1])
-        # print("sum: ", temp_sum)
-        # print("before: ", forward_mat[:, i-1])
         # normalize previous probabilities along column
         forward_mat[:, i - 1] /= np.sum(forward_mat[:, i - 1])
-        # noob way
-        # for k in range(hidden_states):
-        #     forward_mat[k][i - 1] = forward_mat[k][i - 1] / temp_sum
-        # print("afterL: ",forward_mat[:, i-1])
-        # print("sum after: ", np.sum(forward_mat[:, i-1]))
         for j in range(hidden_states):
             for k in range(hidden_states):
                 forward_mat[j][i] += forward_mat[k][i - 1] * transition_matrix[k][j] * emission_matrix[j][i]
 
     # last column normalize
     forward_mat[:, total_observations - 1] /= np.sum(forward_mat[:, total_observations - 1])
-
-    # noob way
-    # temp_sum = np.sum(forward_mat[:, total_observations - 1])
-    # for k in range(hidden_states):
-    #     forward_mat[k][total_observations - 1] = forward_mat[k][total_observations - 1] / temp_sum
-
-
-    # output_to_file(filename="Output/forward_matrix.txt", row=hidden_states, col=total_observations, matrix=forward_mat)
 
     return forward_mat, stationary_distribution
 
@@ -186,37 +170,18 @@ def backward(observations, transition_matrix, means, stds):
 
     backward_mat = np.zeros(shape=(hidden_states, total_observations), dtype=float)
 
-    # print("trans: ", transition_matrix)
-    # print("mean: ", means)
-    # print("std : ", stds)
     for i in range(hidden_states):
         backward_mat[i][total_observations - 1] = 1.0
 
-    # print(backward_mat[:, total_observations-1])
     for i in range(total_observations - 2, -1, -1):
-        temp_sum = np.sum(backward_mat[:, i + 1])
-        # print(f'i: {i} sum: {temp_sum}')
-        # print("before: ", backward_mat[:, i+1])
         # normalize previous probabilities along column
-        backward_mat[:, i+1] /= np.sum(backward_mat[:, i+1])
-        # noob way
-        # for k in range(hidden_states):
-        #     backward_mat[k][i + 1] = backward_mat[k][i + 1] / temp_sum
-        # print("afterL: ",backward_mat[:, i+1])
-        # print("sum after: ", np.sum(backward_mat[:, i+1]))
+        backward_mat[:, i + 1] /= np.sum(backward_mat[:, i + 1])
         for j in range(hidden_states):
             for k in range(hidden_states):
                 backward_mat[j][i] += backward_mat[k][i + 1] * transition_matrix[j][k] * emission_matrix[k][i + 1]
 
     # first column normalize
     backward_mat[:, 0] /= np.sum(backward_mat[:, 0])
-
-    # noob way
-    # temp_sum = np.sum(backward_mat[:, 0])
-    # for k in range(hidden_states):
-    #     backward_mat[k][0] = backward_mat[k][0] / temp_sum
-
-    # output_to_file(filename="Output/backward_matrix.txt", row=hidden_states, col=total_observations, matrix=backward_mat)
     return backward_mat
 
 
@@ -232,19 +197,10 @@ def Baum_Welch(updated_transition_matrix, updated_means_array, updated_stds_arra
 
     # pi star calculation
     fsink = np.sum(f[:, total_observations - 1])
-    # print(fsink)
     pi_star = (f * b) / fsink
 
     # normalize along column
     pi_star /= np.sum(pi_star, axis=0)
-
-    # noob way
-    # for i in range(total_observations):
-    #     temp_sum = np.sum(pi_star[:, i])
-    #     for j in range(hidden_states):
-    #         pi_star[j][i] = pi_star[j][i] / temp_sum
-
-    # output_to_file(filename="Output/pi_star.txt", row=hidden_states, col=total_observations, matrix=pi_star)
 
     # pi double star calculation
 
@@ -261,23 +217,14 @@ def Baum_Welch(updated_transition_matrix, updated_means_array, updated_stds_arra
         for j in range(hidden_states):
             index += 1  # row major way fill-up.....index = row
             for k in range(total_observations - 1):
-                pi_double_star[index][k] = (f[i][k] * updated_transition_matrix[i][j] * emission_matrix[j][k + 1] * b[j][
-                    k + 1]) / fsink
+                pi_double_star[index][k] = (f[i][k] * updated_transition_matrix[i][j] * emission_matrix[j][k + 1] *
+                                            b[j][
+                                                k + 1]) / fsink
 
     # normalize along column
     pi_double_star /= np.sum(pi_double_star, axis=0)
 
-    # noob way to normalize
-    # for i in range(total_observations - 1):
-    #     temp_sum = np.sum(pi_double_star[:, i])
-    #     for j in range(hidden_states * hidden_states):
-    #         pi_double_star[j][i] = pi_double_star[j][i] / temp_sum
-
-    # output_to_file(filename="Output/pi_double_star.txt", row=hidden_states * hidden_states, col=total_observations - 1, matrix=pi_double_star)
-
-    # # M step
-
-    # ### parameter estimation
+    # # M step (parameter estimation)
 
     # transition matrix
     new_transition_mat = np.sum(pi_double_star, axis=1).reshape(hidden_states,
@@ -290,15 +237,10 @@ def Baum_Welch(updated_transition_matrix, updated_means_array, updated_stds_arra
         temp_sum = np.sum(new_transition_mat[i, :])
         for j in range(hidden_states):
             new_transition_mat[i][j] /= temp_sum
-    # print("T: ",new_transition_mat)
-    # print(updated_transition_matrix)
 
     # distribution calculation
     # mean
     new_means_ara = np.matmul(pi_star, obs_ara) / np.sum(pi_star, axis=1)
-    # print(np.matmul(pi_star, obs_ara))
-    # print(np.sum(pi_star, axis=1))
-    # print("means: ", new_means_ara)
 
     # standard deviation
     new_stds_ara = np.zeros(shape=hidden_states, dtype=float)
@@ -306,26 +248,37 @@ def Baum_Welch(updated_transition_matrix, updated_means_array, updated_stds_arra
     for i in range(hidden_states):
         for j in range(total_observations):
             new_stds_ara[i] += pi_star[i][j] * np.square(obs_ara[j] - new_means_ara[i])
-            # print(f'i: {i} j: {j} pi: {pi_star[i][j]} val: {new_means_ara[i]}')
 
     new_stds_ara /= np.sum(pi_star, axis=1)
     new_stds_ara = np.sqrt(new_stds_ara)
-    # print("stds: ", new_stds_ara)
+
     return stationary_dist
 
 
 def convergence_test(prev_T, new_T, prev_mean, new_mean, prev_std, new_std):
-    change_in_T = np.abs(new_T - prev_T)
-    change_in_mean = np.abs(new_mean - prev_mean)
-    change_in_std = np.abs(new_std - prev_std)
+    summation = np.sum(np.abs(new_T - prev_T)) + np.sum(np.abs(new_mean - prev_mean)) + np.sum(
+        np.abs(new_std - prev_std))
 
-    # print(change_in_T, change_in_mean, change_in_std)
-    summation = np.sum(change_in_T) + np.sum(change_in_mean) + np.sum(change_in_std)
-    # print(sum)
-    if summation < 0.00001:
-        return True
-    else:
-        return False
+    return summation < 0.00001
+
+
+def learned_parameter_to_file(filename, hidden_states, new_transition_mat, new_means_ara, new_stds_ara,
+                              stationary_distribution):
+    with open(filename, "w") as p_out:
+        p_out.write(str(hidden_states) + "\n")
+        for idx in range(hidden_states):
+            for j in range(hidden_states):
+                p_out.write(str(new_transition_mat[idx][j]) + "\t\t")
+            p_out.write("\n")
+        for j in range(hidden_states):
+            p_out.write(str(new_means_ara[j]) + "\t\t")
+        p_out.write("\n")
+        for j in range(hidden_states):
+            p_out.write(str(np.square(new_stds_ara[j])) + "\t\t")
+        p_out.write("\n")
+        for j in range(hidden_states):
+            p_out.write(str(stationary_distribution[j]) + "\t\t")
+        p_out.write("\n")
 
 
 # Press the green button in the gutter to run the script.
@@ -351,6 +304,7 @@ if __name__ == '__main__':
     # BAUM_WELCH IMPLEMENTATION
     # convergence
     convergence_interation = -1
+    max_iteration = 1000
     prev_transition_mat = []
     prev_means_ara = []
     prev_stds_ara = []
@@ -359,7 +313,7 @@ if __name__ == '__main__':
     new_means_ara = means_array.copy()
     new_stds_ara = stds_array.copy()
 
-    for i in range(1000):
+    for i in range(max_iteration):
         prev_transition_mat = new_transition_mat.copy()
         prev_means_ara = new_means_ara.copy()
         prev_stds_ara = new_stds_ara.copy()
@@ -370,24 +324,21 @@ if __name__ == '__main__':
         if convergence_test(prev_T=prev_transition_mat, new_T=new_transition_mat, prev_mean=prev_means_ara,
                             new_mean=new_means_ara, prev_std=prev_stds_ara, new_std=new_stds_ara):
             convergence_interation = i
-            with open("Output/parameters_learned.txt", "w") as p_out:
-                p_out.write(str(hidden_states)+"\n")
-                for idx in range(hidden_states):
-                    for j in range(hidden_states):
-                        p_out.write(str(new_transition_mat[idx][j])+"\t\t")
-                    p_out.write("\n")
-                for j in range(hidden_states):
-                    p_out.write(str(new_means_ara[j]) + "\t\t")
-                p_out.write("\n")
-                for j in range(hidden_states):
-                    p_out.write(str(np.square(new_stds_ara[j])) + "\t\t")
-                p_out.write("\n")
-                for j in range(hidden_states):
-                    p_out.write(str(stationary_distribution[j]) + "\t\t")
-                p_out.write("\n")
+            learned_parameter_to_file("Output/parameters_learned.txt", hidden_states, new_transition_mat, new_means_ara, new_stds_ara, stationary_distribution)
             break
 
     print(f'Converged after iteration: {convergence_interation}')
     viterbi(observations=obs_ara, transition_matrix=new_transition_mat, means=new_means_ara, stds=new_stds_ara,
             state_names_array=state_names, output_file="Output/states_Viterbi_after_learning.txt")
 
+    # scikit HMM learn compare
+    print("\nScikit hmmlearn results:\n")
+
+    hmm_obs = obs_ara.copy().reshape(-1, 1)
+    model = GaussianHMM(n_components=hidden_states)
+    model.fit(hmm_obs)
+
+    print("Transition Matrix: ", model.transmat_)
+    print("means: ", model.means_)
+    print("variances: ", model.covars_)
+    print("stationary: ", model.get_stationary_distribution())
